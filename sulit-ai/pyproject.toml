@@ -1,0 +1,29 @@
+[project]
+name = "sulit-ai"
+version = "0.1.0"
+description = "Sulit AI service: LLM chat gateway"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "openai>=1.55",
+    "anthropic>=0.40",
+    "google-genai>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

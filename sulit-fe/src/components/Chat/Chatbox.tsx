@@ -1,48 +1,53 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowUp } from "lucide-react";
-import React from "react";
 
-const Chatbox = ({ onSend, isDisabled }: { onSend: (value: string) => void; isDisabled: boolean }) => {
-  const [inputValue, setInputValue] = React.useState("");
+// Must stay in sync with the backend's ChatRequest @Size limit.
+const MAX_MESSAGE_LENGTH = 4000;
 
-  const handleSend = () => {
-    const trimmedValue = inputValue.trim();
+type ChatboxProps = {
+  onSend: (value: string) => void;
+  isDisabled: boolean;
+};
 
-    if (!trimmedValue || isDisabled) {
+export default function Chatbox({ onSend, isDisabled }: ChatboxProps) {
+  const [inputValue, setInputValue] = useState("");
+  const trimmedValue = inputValue.trim();
+  const canSend = trimmedValue.length > 0 && !isDisabled;
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!canSend) {
       return;
     }
-
     onSend(trimmedValue);
     setInputValue("");
   };
 
   return (
-    <div className="chatbox-input mt-5 flex items-center">
+    <form className="chatbox-input mt-5 flex items-center gap-2" onSubmit={handleSubmit}>
       <Input
         value={inputValue}
-        disabled={isDisabled}
-        onChange={(e) => setInputValue((e.target as HTMLInputElement).value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            handleSend();
-          }
-        }}
+        onChange={(e) => setInputValue(e.currentTarget.value)}
+        maxLength={MAX_MESSAGE_LENGTH}
         placeholder="What's on your mind?"
-        className="h-13 flex-1 border-border bg-input px-4 text-[15px] text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-70"
+        aria-label="Message"
+        autoComplete="off"
+        className="h-13 flex-1 border-border bg-input px-4 text-[15px] text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0"
       />
 
       <Button
+        type="submit"
         size="icon"
-        disabled={isDisabled}
+        disabled={!canSend}
         className="h-12 w-12 rounded-full bg-primary text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
         aria-label="Send"
-        onClick={handleSend}
       >
         <ArrowUp className="h-4 w-4" strokeWidth={2.6} />
       </Button>
-    </div>
+    </form>
   );
-};
-
-export default Chatbox;
+}
