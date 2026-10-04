@@ -18,6 +18,7 @@ export default function Chatbox({ onSend, isDisabled }: ChatboxProps) {
   const trimmedValue = inputValue.trim();
   const canSend = trimmedValue.length > 0 && !isDisabled;
 
+
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!canSend) {
