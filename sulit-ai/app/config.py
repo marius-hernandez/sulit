@@ -12,6 +12,11 @@ DEFAULT_SYSTEM_PROMPT = (
     "Keep answers concise and actionable."
 )
 
+PSA_PRICE_POLICY = (
+    "Only cite PSA-reported prices when PSA price data is supplied in the conversation; "
+    "otherwise say that no PSA price is available."
+)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")

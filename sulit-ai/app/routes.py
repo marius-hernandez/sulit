@@ -1,12 +1,13 @@
 
 import logging
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.config import Settings, get_settings
 from app.dependencies import verify_internal_api_key, get_agent
 from app.schemas import ChatRequest, ChatResponse
-from app.tools.psa_prices import fetch_psa_data
+from app.tools.psa_prices import get_price_context_for_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -31,18 +32,20 @@ async def chat(
             for message in request.messages
         ]
 
+        try:
+            price_context = await get_price_context_for_prompt(request.messages[-1].content)
+        except httpx.HTTPError:
+            logger.warning("PSA price lookup failed; continuing without price context.", exc_info=True)
+            price_context = None
+
+        if price_context:
+            messages.insert(0, {"role": "system", "content": price_context})
+
         result = await agent.ainvoke({
             "messages": messages,
         })
 
         reply = result["messages"][-1].content
-
-        data = await fetch_psa_data({
-            "Year": ["6", "7", "8"],
-        })
-
-        print(type(data))
-        print(list(data.keys()) if isinstance(data, dict) else "Not a dict")
 
     except Exception:
         logger.exception("Agent invocation failed")

@@ -2,14 +2,7 @@
 from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
 
-from app.config import Settings, get_settings
-
-DEFAULT_SYSTEM_PROMPT = (
-    "You are Sulit, a friendly and practical grocery buddy. "
-    "Help users plan grocery lists, stay within budget, "
-    "and find good-value alternatives. "
-    "Keep answers concise and actionable."
-)
+from app.config import PSA_PRICE_POLICY, Settings
 
 
 def build_agent(settings: Settings):
@@ -64,5 +57,5 @@ def build_agent(settings: Settings):
     return create_agent(
         model=model,
         tools=[],
-        system_prompt=settings.system_prompt or DEFAULT_SYSTEM_PROMPT,
+        system_prompt=f"{PSA_PRICE_POLICY} {settings.system_prompt}",
     )
