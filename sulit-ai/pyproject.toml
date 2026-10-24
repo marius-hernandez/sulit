@@ -4,13 +4,17 @@ version = "0.1.0"
 description = "Sulit AI service: LLM chat gateway"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115",
+    "fastapi[standard]>=0.115",
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "openai>=1.55",
     "anthropic>=0.40",
     "google-genai>=1.0",
+    "python-dotenv>=1.2.4",
+    "langgraph>=1.2.14",
+    "langchain[anthropic,openai]>=1.4.4",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]

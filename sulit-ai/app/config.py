@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-LLMProviderName = Literal["openai", "anthropic", "gemini", "ollama"]
+LLMProviderName = Literal["openai", "anthropic", "gemini", "ollama", "freellmapi"]
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are Sulit, a friendly and practical grocery buddy. "
