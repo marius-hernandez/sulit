@@ -22,36 +22,34 @@ def _dimension(metadata: dict[str, Any], code: str) -> dict[str, Any]:
 
 def _candidate_datasets(prompt: str) -> list[MarketDataset]:
     prompt_words = _words(prompt)
-    candidates = [
+    return [
         dataset for dataset in MARKET_DATASETS
         if any(_words(alias) & prompt_words for alias in dataset.aliases)
     ]
-    return candidates
 
 
 def _match_codes(prompt: str, metadata: dict[str, Any]) -> list[str]:
+    prompt_words = _words(prompt)
+    # Avoid cross-matching related catalogue labels (e.g. chicken eggs when
+    # the user only asked for chicken meat).
+    if "egg" not in prompt_words and "eggs" not in prompt_words:
+        exclude_eggs = True
+    else:
+        exclude_eggs = False
+
     commodity = _dimension(metadata, "Commodity")
-    codes = commodity.get("values", [])
-    names = commodity.get("valueTexts", [])
+    codes, names = commodity.get("values", []), commodity.get("valueTexts", [])
     if len(codes) != len(names):
         raise ValueError("PSA Commodity metadata has mismatched values and valueTexts.")
 
-    requested_terms = [term for term in _SPLIT.split(prompt) if _words(term)]
     matches: list[tuple[str, int]] = []
-
     for code, name in zip(codes, names, strict=True):
         catalog_words = _words(name)
-        best_score = 0
-        for term in requested_terms:
-            term_words = _words(term)
-            # Ignore a broad one-word match such as 'fresh' or 'vegetable'.
-            score = len(term_words & catalog_words)
-            if term_words and term_words <= catalog_words:
-                score += 2
-            best_score = max(best_score, score)
-        if best_score >= 1:
-            matches.append((code, best_score))
-
+        if exclude_eggs and "egg" in catalog_words:
+            continue
+        score = len(catalog_words & prompt_words)
+        if score:
+            matches.append((code, score))
     if not matches:
         return []
     highest = max(score for _, score in matches)
@@ -61,7 +59,6 @@ def _match_codes(prompt: str, metadata: dict[str, Any]) -> list[str]:
 async def resolve_commodity_datasets(
     prompt: str,
 ) -> list[tuple[MarketDataset, dict[str, Any], list[str]]]:
-    """Resolve a user query to dataset metadata and official commodity codes."""
     resolved = []
     for dataset in _candidate_datasets(prompt):
         metadata = await psa_client.get_metadata(dataset)
