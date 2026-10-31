@@ -1,55 +1,71 @@
-from dataclasses import dataclass
+import logging
+from typing import Any
 
-@dataclass(frozen=True)
-class MarketDataset:
-    name: str
-    url: str
+from app.services.prices.resolver import _dimension
 
-_PSA_BASE_URL="https://openstat.psa.gov.ph/PXWeb/api/v1/en/"
+logger = logging.getLogger(__name__)
 
-MARKET_DATASETS: dict[str, MarketDataset] = {
-    "cereals": MarketDataset(
-        name="cereals",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN01.px"
-    ),
-    "root-crops": MarketDataset(
-        name="root-crops",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN02.px"
-    ),
-    "legumes": MarketDataset(
-        name="legumes",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN03.px"
-    ),
-    "condiments": MarketDataset(
-        name="condiments",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN04.px"
-    ),
-    "fruit-vegetables": MarketDataset(
-        name="fruit-vegetables",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN05.px"
-    ),
-    "leafy-vegetables": MarketDataset(
-        name="leafy-vegetables",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN06.px"
-    ),
-    "fruits": MarketDataset(
-        name="fruits",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN07.px"
-    ),
-    "commercial-crops": MarketDataset(
-        name="commercial-crops",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN08.px"
-    ),
-    "livestock": MarketDataset(
-        name="livestock",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN09.px"
-    ),
-    "poultry": MarketDataset(
-        name="poultry",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN10.px"
-    ),
-    "fish": MarketDataset(
-        name="fish",
-        url= _PSA_BASE_URL+ "DB/2M/2018NEW/0042M4ARN11.px"
-    ),
+_MONTHS = {
+    "january": 1, "february": 2, "march": 3, "april": 4,
+    "may": 5, "june": 6, "july": 7, "august": 8,
+    "september": 9, "october": 10, "november": 11, "december": 12,
 }
+
+
+def _period_key(record: dict[str, str]) -> tuple[int, int]:
+    try:
+        year = int(record.get("Year", "0"))
+    except (TypeError, ValueError):
+        year = 0
+    return year, _MONTHS.get(record.get("Period", "").lower(), 0)
+
+
+def format_price_context(
+    dataset_name: str,
+    data: dict[str, Any],
+    metadata: dict[str, Any],
+) -> str | None:
+    """Translate PXWeb category codes to labels and keep the latest row per commodity."""
+    columns = [column for column in data.get("columns", []) if column.get("type") != "c"]
+    dimension_codes = [column.get("code") for column in columns]
+    if not dimension_codes or any(not code for code in dimension_codes):
+        logger.warning("PXWeb response for %s has missing dimension column codes.", dataset_name)
+        return None
+
+    label_maps: dict[str, dict[str, str]] = {}
+    for code in dimension_codes:
+        dimension = _dimension(metadata, code)
+        values = dimension.get("values", [])
+        labels = dimension.get("valueTexts", [])
+        if len(values) != len(labels):
+            raise ValueError(f"PSA metadata dimension '{code}' has mismatched labels.")
+        label_maps[code] = dict(zip(values, labels, strict=True))
+
+    latest: dict[str, tuple[tuple[int, int], dict[str, str], Any]] = {}
+    for row in data.get("data", []):
+        keys, values = row.get("key", []), row.get("values", [])
+        if len(keys) != len(dimension_codes) or not values or values[0] is None:
+            continue
+        record = {
+            code: label_maps[code].get(key, key)
+            for code, key in zip(dimension_codes, keys, strict=True)
+        }
+        commodity_code = keys[dimension_codes.index("Commodity")] if "Commodity" in dimension_codes else ""
+        commodity_labels = label_maps.get("Commodity", {})
+        commodity_name = commodity_labels.get(commodity_code, commodity_code)
+        period = _period_key(record)
+        previous = latest.get(commodity_code)
+        if previous is None or period > previous[0]:
+            latest[commodity_code] = (period, record | {"Commodity": commodity_name}, values[0])
+
+    if not latest:
+        return None
+
+    lines = [f"PSA-reported Philippine retail prices ({dataset_name}):"]
+    for code, (_, record, price) in sorted(latest.items()):
+        lines.append(
+            f"- {record.get('Commodity', 'Unknown commodity')} (PSA code: {code}): "
+            f"{price}; {record.get('Period', 'unknown period')} {record.get('Year', '')}; "
+            f"{record.get('Geolocation', 'Philippines')}"
+        )
+    return "\n".join(lines)
