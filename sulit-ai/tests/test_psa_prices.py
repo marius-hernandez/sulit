@@ -1,70 +1,52 @@
 import unittest
 
-from app.tools.psa_prices import _format_price_context, find_commodity_codes
+from app.services.prices.formatter import format_price_context
+from app.services.prices.resolver import _match_codes, month_codes, recent_year_codes
 
 
 METADATA = {
     "variables": [
-        {
-            "code": "Commodity",
-            "values": ["0", "1", "2"],
-            "valueTexts": [
-                "FRESH CHICKEN, BREAST, 1 KG",
-                "FRESH CHICKEN, LEGS, 1 KG",
-                "FRESH EGG, CHICKEN, MEDIUM, 1 PC",
-            ],
-        }
+        {"code": "Commodity", "values": ["0", "1", "2"], "valueTexts": [
+            "FRESH CHICKEN, BREAST, 1 KG", "FRESH CHICKEN, LEGS, 1 KG",
+            "FRESH EGG, CHICKEN, MEDIUM, 1 PC",
+        ]},
+        {"code": "Geolocation", "values": ["000000000"], "valueTexts": ["Philippines"]},
+        {"code": "Year", "values": ["2025", "2026"], "valueTexts": ["2025", "2026"]},
+        {"code": "Period", "values": ["01", "02"], "valueTexts": ["June", "July"]},
     ]
 }
 
 
 class PsaPricesTests(unittest.TestCase):
-    def test_finds_most_specific_commodity_in_prompt(self) -> None:
-        result = find_commodity_codes("What is the price of chicken breasts?", METADATA)
+    def test_matches_specific_commodity(self):
+        self.assertEqual(_match_codes("chicken breasts", METADATA), ["0"])
 
-        self.assertEqual(result, ["0"])
+    def test_matches_all_chicken_products_but_not_eggs(self):
+        self.assertEqual(_match_codes("chicken", METADATA), ["0", "1"])
 
-    def test_finds_all_commodities_in_a_multi_good_prompt(self) -> None:
-        result = find_commodity_codes("What are the prices of chicken and eggs?", METADATA)
+    def test_matches_multiple_requested_goods(self):
+        self.assertEqual(_match_codes("chicken and eggs", METADATA), ["0", "1", "2"])
 
-        self.assertEqual(result, ["0", "1", "2"])
+    def test_year_and_month_codes_come_from_metadata(self):
+        self.assertEqual(recent_year_codes(METADATA), ["2025", "2026"])
+        self.assertEqual(month_codes(METADATA), ["01", "02"])
 
-    def test_finds_all_equally_specific_commodities(self) -> None:
-        result = find_commodity_codes("What are the chicken prices?", METADATA)
-
-        self.assertEqual(result, ["0", "1"])
-
-    def test_formats_only_available_price_records(self) -> None:
-        result = _format_price_context({
+    def test_formats_latest_price_using_metadata_labels(self):
+        result = format_price_context("poultry", {
             "columns": [
-                {"text": "Geolocation"},
-                {"text": "Commodity"},
-                {"text": "Year"},
-                {"text": "Period"},
+                {"code": "Geolocation", "type": "d"},
+                {"code": "Commodity", "type": "d"},
+                {"code": "Year", "type": "d"},
+                {"code": "Period", "type": "d"},
+                {"code": "Value", "type": "c"},
             ],
             "data": [
-                {
-                    "key": ["PHILIPPINES", "FRESH CHICKEN, BREAST, 1 KG", "2025", "December"],
-                    "values": [210.0],
-                },
-                {
-                    "key": ["PHILIPPINES", "FRESH CHICKEN, BREAST, 1 KG", "2026", "June"],
-                    "values": [215.0],
-                },
-                {
-                    "key": ["PHILIPPINES", "FRESH CHICKEN, BREAST, 1 KG", "2026", "July"],
-                    "values": [220.0],
-                },
-                {
-                    "key": ["PHILIPPINES", "FRESH CHICKEN, LEGS, 1 KG", "2026", "July"],
-                    "values": [None],
-                },
+                {"key": ["000000000", "0", "2025", "01"], "values": [210.0]},
+                {"key": ["000000000", "0", "2026", "02"], "values": [220.0]},
             ],
-        })
-
-        self.assertIsNotNone(result)
-        self.assertIn("220.0 (July, 2026; PHILIPPINES)", result)
-        self.assertNotIn("215.0", result)
+        }, METADATA)
+        self.assertIn("FRESH CHICKEN, BREAST, 1 KG", result)
+        self.assertIn("220.0", result)
         self.assertNotIn("210.0", result)
 
 
