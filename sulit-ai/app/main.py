@@ -3,28 +3,18 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from rich.logging import RichHandler
 
 from app.agent import build_agent
 from app.config import get_settings
-from app.llm import create_provider
 from app.routes import router
 
-from typing import Annotated, Literal
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langchain.chat_models import init_chat_model
-from pydantic import BaseModel, Field
 
-from langchain.agents import create_agent
-from langchain.tools import tool
-import requests
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-
-
-def get_recent_market_price(item:str):
-    response=requests.get(f'https://wttr.in/{item}?format=j1')
-    return response.json()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[RichHandler(rich_tracebacks=True)],
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:

@@ -33,16 +33,21 @@ async def chat(
         ]
 
         try:
-            price_context = await get_price_context_for_prompt(request.messages[-1].content)
-        except httpx.HTTPError:
-            logger.warning("PSA price lookup failed; continuing without price context.", exc_info=True)
+            price_context = await get_price_context_for_prompt(
+                request.messages[-1].content
+            )
+        except Exception:
+            logger.warning(
+                "PSA price lookup failed; continuing without price context.",
+                exc_info=True,
+            )
             price_context = None
 
         if price_context:
             messages.insert(0, {"role": "system", "content": price_context})
 
         result = await agent.ainvoke({
-            "messages": messages,
+            "messages": messages
         })
 
         reply = result["messages"][-1].content
