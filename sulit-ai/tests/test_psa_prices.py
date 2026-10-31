@@ -21,8 +21,11 @@ class PsaPricesTests(unittest.TestCase):
     def test_matches_specific_commodity(self):
         self.assertEqual(_match_codes("chicken breasts", METADATA), ["0"])
 
-    def test_matches_all_chicken_products_for_broad_request(self):
+    def test_matches_all_chicken_products_but_not_eggs(self):
         self.assertEqual(_match_codes("chicken", METADATA), ["0", "1"])
+
+    def test_matches_multiple_requested_goods(self):
+        self.assertEqual(_match_codes("chicken and eggs", METADATA), ["0", "1", "2"])
 
     def test_year_and_month_codes_come_from_metadata(self):
         self.assertEqual(recent_year_codes(METADATA), ["2025", "2026"])

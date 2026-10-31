@@ -4,7 +4,7 @@ from typing import Any
 from app.services.prices.psa_client import psa_client
 from app.services.prices.registry import MARKET_DATASETS, MarketDataset
 
-_NOISE = {"fresh", "edible", "loose", "dressed", "whole", "kg", "pc", "price", "prices", "market", "how", "much", "cost"}
+_NOISE = {"fresh", "edible", "loose", "dressed", "whole", "kg", "pc", "price", "prices", "market", "how", "much", "cost", "what", "are", "the", "of"}
 _SPLIT = re.compile(r"\s*(?:,|/|&|\band\b)\s*", re.IGNORECASE)
 
 
@@ -29,31 +29,29 @@ def _candidate_datasets(prompt: str) -> list[MarketDataset]:
 
 
 def _match_codes(prompt: str, metadata: dict[str, Any]) -> list[str]:
-    prompt_words = _words(prompt)
-    # Avoid cross-matching related catalogue labels (e.g. chicken eggs when
-    # the user only asked for chicken meat).
-    if "egg" not in prompt_words and "eggs" not in prompt_words:
-        exclude_eggs = True
-    else:
-        exclude_eggs = False
-
     commodity = _dimension(metadata, "Commodity")
     codes, names = commodity.get("values", []), commodity.get("valueTexts", [])
     if len(codes) != len(names):
         raise ValueError("PSA Commodity metadata has mismatched values and valueTexts.")
 
-    matches: list[tuple[str, int]] = []
-    for code, name in zip(codes, names, strict=True):
-        catalog_words = _words(name)
-        if exclude_eggs and "egg" in catalog_words:
-            continue
-        score = len(catalog_words & prompt_words)
-        if score:
-            matches.append((code, score))
-    if not matches:
-        return []
-    highest = max(score for _, score in matches)
-    return [code for code, score in matches if score == highest]
+    matched: list[str] = []
+    requested_terms = [term for term in _SPLIT.split(prompt) if _words(term)]
+    for term in requested_terms:
+        term_words = _words(term)
+        term_matches: list[tuple[str, int]] = []
+        for code, name in zip(codes, names, strict=True):
+            catalog_words = _words(name)
+            if "egg" in catalog_words and "egg" not in term_words:
+                continue
+            score = len(catalog_words & term_words)
+            if score:
+                term_matches.append((code, score))
+        if term_matches:
+            highest = max(score for _, score in term_matches)
+            for code, score in term_matches:
+                if score == highest and code not in matched:
+                    matched.append(code)
+    return matched
 
 
 async def resolve_commodity_datasets(
